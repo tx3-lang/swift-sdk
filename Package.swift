@@ -14,7 +14,11 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/attaswift/BigInt.git",
-            exact: "6.0.1"
+            exact: "5.7.0"
+        ),
+        .package(
+            url: "https://github.com/Kingpin-Apps/swift-nacl.git",
+            exact: "1.0.2"
         ),
     ],
     targets: [
@@ -22,11 +26,14 @@ let package = Package(
             name: "Tx3SDK",
             dependencies: [
                 .product(name: "BigInt", package: "BigInt"),
-            ]
+                .product(name: "SwiftNaCl", package: "swift-nacl"),
+            ],
+            resources: [.copy("Resources/bip39-english.txt")]
         ),
         .testTarget(
             name: "Tx3SDKTests",
-            dependencies: ["Tx3SDK"]
+            dependencies: ["Tx3SDK"],
+            resources: [.copy("Fixtures/signer-vectors.json")]
         ),
         .testTarget(
             name: "Tx3SDKE2ETests",

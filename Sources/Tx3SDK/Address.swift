@@ -44,7 +44,9 @@ public struct Address: Codable, Hashable, Sendable {
         guard let separator = value.lastIndex(of: "1") else { return false }
         let hrp = value[..<separator].lowercased()
         let payload = value[value.index(after: separator)...].lowercased()
-        guard !hrp.isEmpty, payload.count >= 6, value.count <= 90 else { return false }
+        // Cardano intentionally permits Bech32 addresses beyond BIP-173's original 90-character
+        // recommendation (for example, Shelley base addresses).
+        guard !hrp.isEmpty, payload.count >= 6, value.count <= 1_023 else { return false }
         guard hrp.unicodeScalars.allSatisfy({ (33...126).contains($0.value) }) else { return false }
 
         let alphabet = Array("qpzry9x8gf2tvdw0s3jn54khce6mua7l")

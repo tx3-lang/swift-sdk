@@ -56,10 +56,18 @@ public enum ResolutionFailure: Equatable, Sendable {
 public enum SigningFailure: Equatable, Sendable {
     /// Key material does not satisfy the signer contract.
     case invalidKey
+    /// A mnemonic does not satisfy BIP-39 validation.
+    case invalidMnemonic
+    /// A transaction hash is malformed or is not exactly 32 bytes.
+    case invalidHash
+    /// The supplied address is not a supported Cardano payment-key address.
+    case invalidAddress
     /// A transaction hash is malformed or does not match the transaction.
     case hashMismatch
     /// The supplied address is not bound to the signing key.
     case addressMismatch
+    /// The approved cryptographic primitive failed to produce a result.
+    case cryptoFailure
     /// The signer rejected the request.
     case rejected(context: String)
 }
