@@ -63,7 +63,9 @@ public enum ArgEncoder {
             default: throw mismatch(path, expected: "BigInt, Int, or Int64")
             }
             guard integer >= minimumInteger, integer <= maximumInteger else {
-                throw Tx3Error.validation(.integerOutOfRange)
+                throw Tx3Error.validation(
+                    .integerOutOfRange(path: path, expected: "signed i128 integer")
+                )
             }
             return .integer(integer)
 
@@ -185,8 +187,16 @@ public enum ArgEncoder {
         case is NSNull: return .null
         case let value as Bool: return .boolean(value)
         case let value as String: return .string(value)
-        case let value as Int: return .number(Double(value))
-        case let value as Int64: return .number(Double(value))
+        case let value as Int:
+            guard let number = Double(exactly: value) else {
+                throw mismatch(path, expected: "JSON integer exactly representable as Double")
+            }
+            return .number(number)
+        case let value as Int64:
+            guard let number = Double(exactly: value) else {
+                throw mismatch(path, expected: "JSON integer exactly representable as Double")
+            }
+            return .number(number)
         case let value as Double where value.isFinite: return .number(value)
         case let value as [Any]:
             return .array(
@@ -196,7 +206,11 @@ public enum ArgEncoder {
             )
         case let value as [String: Any]:
             return .object(
-                try value.mapValues { try jsonValue(from: $0, path: path) }
+                try Dictionary(
+                    uniqueKeysWithValues: value.map { key, item in
+                        (key, try jsonValue(from: item, path: "\(path).\(key)"))
+                    }
+                )
             )
         default: throw mismatch(path, expected: "JSON-compatible value")
         }

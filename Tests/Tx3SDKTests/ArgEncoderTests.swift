@@ -76,7 +76,11 @@ struct ArgEncoderTests {
                 == #"{"bytes":"0xdeadbeef"}"#
         )
 
-        #expect(throws: Tx3Error.validation(.integerOutOfRange)) {
+        #expect(
+            throws: Tx3Error.validation(
+                .integerOutOfRange(path: "$", expected: "signed i128 integer")
+            )
+        ) {
             try ArgEncoder.encode(BigInt(1) << 127, as: .integer)
         }
         let floatingPointError = Tx3Error.resolution(
@@ -116,6 +120,32 @@ struct ArgEncoderTests {
         #expect(try ArgEncoder.encode(value, as: .unknown(.null)) == .json(value))
         #expect(try ArgEncoder.encode(value, as: .utxo) == .json(value))
         #expect(try ArgEncoder.encode(value, as: .anyAsset) == .json(value))
+    }
+
+    @Test("nested validation failures retain their full path and expected kind")
+    func nestedValidationPaths() {
+        let outOfRange = Tx3Error.validation(
+            .integerOutOfRange(path: "$.items[0]", expected: "signed i128 integer")
+        )
+        #expect(throws: outOfRange) {
+            try ArgEncoder.encode(
+                ["items": [BigInt(1) << 127]],
+                as: .record([ParamField(name: "items", type: .list(.integer))])
+            )
+        }
+
+        let lossyInteger = Tx3Error.resolution(
+            .invalidArgument(
+                path: "$.outer.value",
+                expected: "JSON integer exactly representable as Double"
+            )
+        )
+        #expect(throws: lossyInteger) {
+            try ArgEncoder.encode(
+                ["outer": ["value": Int64(9_007_199_254_740_993)]],
+                as: .unknown(.null)
+            )
+        }
     }
 
     private func loadOracle() throws -> Oracle {
