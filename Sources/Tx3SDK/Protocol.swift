@@ -127,6 +127,12 @@ public struct Protocol: Equatable, Sendable {
             guard let tir = transactionObject["tir"], tir.objectValue != nil else {
                 throw invalidSchema("$.transactions.\(name).tir")
             }
+            guard
+                let tirData = try? JSONEncoder().encode(tir),
+                (try? JSONDecoder().decode(TIREnvelope.self, from: tirData)) != nil
+            else {
+                throw invalidSchema("$.transactions.\(name).tir")
+            }
             guard let params = transactionObject["params"], params.objectValue != nil else {
                 throw invalidSchema("$.transactions.\(name).params")
             }
@@ -189,17 +195,5 @@ public struct Protocol: Equatable, Sendable {
         }
         let path = codingPath.map(\.stringValue).joined(separator: ".")
         return path.isEmpty ? "JSON document" : "$.\(path)"
-    }
-}
-
-/// A value-semantic client-construction seed.
-///
-/// Facade configuration and the fallible build terminal are added by the facade layer;
-/// consumers enter that flow only through ``Protocol/client()``.
-public struct Tx3ClientBuilder: Sendable {
-    let protocolValue: Protocol
-
-    fileprivate init(protocol: Protocol) {
-        protocolValue = `protocol`
     }
 }

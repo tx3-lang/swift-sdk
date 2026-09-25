@@ -42,8 +42,42 @@ for (name, type) in transfer?.parameters ?? [:] {
 `Protocol` retains the raw TIR envelopes and JSON schemas while exposing the
 interpreted recursive `ParamType` model. Unsupported schema nodes remain
 available through `ParamType.unknown` instead of being guessed or rejected.
-`Protocol.client()` is the single bridge into the dynamic client-builder flow;
-facade configuration and transaction lifecycle APIs arrive in later revisions.
+`Protocol.client()` is the single bridge into the dynamic client-builder flow.
+
+## Build and resolve a transaction
+
+Configure the endpoint and optional profile, party, header, and environment
+values with the value-semantic client builder. Optional name validation is
+deferred until `build()` so configuration chains remain fluent:
+
+```swift
+let client = try Protocol.fromFile(tiiURL)
+    .client()
+    .trpEndpoint(URL(string: "https://trp.example/rpc")!)
+    .withProfile("preprod")
+    .withHeader("Authorization", "Bearer …")
+    .withParty("sender", .address(try Address("001122aabbcc")))
+    .withEnvValue("network", .string("preview"))
+    .build()
+
+let resolved = try await client
+    .tx("transfer")
+    .arg("quantity", 10_000_000)
+    .resolve()
+
+print(resolved.hash, resolved.txHex)
+```
+
+`build()` distinguishes missing TRP configuration, unknown profiles, and
+unknown parties through `Tx3Error`. Transaction lookup reports `unknownTx`, and
+missing or invalid arguments fail before transport. Explicit transaction
+arguments override injected party addresses; explicit environment values
+override the selected profile. Built clients do not expose profile switching.
+
+Generated bindings seed the same builder with
+`Tx3ClientBuilder.fromParts(transactions:profiles:knownParties:)` and provide
+statically constructed `ArgValue` values through `TxBuilder.argTagged`. They do
+not carry a TII schema or use a separate client or resolution path.
 
 ## Low-level TRP client
 
@@ -76,7 +110,7 @@ JSON-RPC, malformed-response, timeout, and cancellation failures without string
 matching. Custom transports can be injected with
 `TRPClient(options:transport:)` for deterministic tests or alternate HTTP stacks.
 
-Higher-level transaction facade APIs are intentionally not part of this revision.
+Signing, submission, and polling are intentionally not part of this revision.
 An unavailable operation is never represented as a successful result.
 
 ## Tx3 protocol compatibility
