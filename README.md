@@ -25,9 +25,63 @@ Then import the public module:
 import Tx3SDK
 ```
 
-Runtime protocol loading and transaction lifecycle APIs are intentionally not
-part of this foundation revision. An unavailable operation is never represented
-as a successful result.
+## Load a protocol
+
+Load a canonical `.tii` document from a file URL, JSON bytes, a string, or an
+already parsed `JSONValue`:
+
+```swift
+let protocolValue = try Protocol.fromFile(tiiURL)
+let transfer = protocolValue.transactions["transfer"]
+
+for (name, type) in transfer?.parameters ?? [:] {
+    print("\(name): \(type)")
+}
+```
+
+`Protocol` retains the raw TIR envelopes and JSON schemas while exposing the
+interpreted recursive `ParamType` model. Unsupported schema nodes remain
+available through `ParamType.unknown` instead of being guessed or rejected.
+`Protocol.client()` is the single bridge into the dynamic client-builder flow;
+facade configuration and transaction lifecycle APIs arrive in later revisions.
+
+## Low-level TRP client
+
+Advanced consumers can call the Transaction Resolver Protocol directly. Configure
+the endpoint and any hosted-service headers once, then use the async client:
+
+```swift
+let client = TRPClient(
+    options: ClientOptions(
+        endpoint: URL(string: "https://trp.example/rpc")!,
+        headers: ["Authorization": "Bearer …"],
+        timeout: .seconds(30)
+    )
+)
+
+let resolved = try await client.resolve(
+    ResolveParams(
+        tir: TIREnvelope(encoding: .hex, content: tirHex, version: "v1"),
+        args: ["quantity": .integer(100)]
+    )
+)
+let submitted = try await client.submit(
+    SubmitParams(tx: signedTransaction, witnesses: witnesses)
+)
+let status = try await client.checkStatus([submitted.hash])
+```
+
+TRP operations throw `Tx3Error.transport`. Its cases distinguish network, HTTP,
+JSON-RPC, malformed-response, timeout, and cancellation failures without string
+matching. Custom transports can be injected with
+`TRPClient(options:transport:)` for deterministic tests or alternate HTTP stacks.
+
+Higher-level transaction facade APIs are intentionally not part of this revision.
+An unavailable operation is never represented as a successful result.
+
+## Tx3 protocol compatibility
+
+Tx3 protocol compatibility: TRP `v1beta0`; TII schema `v1beta0`.
 
 ## Development
 

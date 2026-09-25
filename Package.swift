@@ -9,7 +9,7 @@ let package = Package(
         .iOS(.v18),
     ],
     products: [
-        .library(name: "Tx3SDK", targets: ["Tx3SDK"]),
+        .library(name: "Tx3SDK", targets: ["Tx3SDK"])
     ],
     dependencies: [
         .package(
@@ -33,7 +33,7 @@ let package = Package(
         .testTarget(
             name: "Tx3SDKTests",
             dependencies: ["Tx3SDK"],
-            resources: [.copy("Fixtures/signer-vectors.json")]
+            resources: [.copy("Fixtures")]
         ),
         .testTarget(
             name: "Tx3SDKE2ETests",

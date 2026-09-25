@@ -256,12 +256,16 @@ private enum CardanoAddress {
     }
 
     private static func decodeBech32(_ value: String) -> (prefix: String, bytes: [UInt8])? {
-        guard value == value.lowercased(), let separator = value.lastIndex(of: "1") else {
+        guard value == value.lowercased() || value == value.uppercased() else {
             return nil
         }
-        let prefix = String(value[..<separator])
-        let payload = value[value.index(after: separator)...]
-        guard !prefix.isEmpty, payload.count >= 6, value.count <= 1023 else {
+        let normalized = value.lowercased()
+        guard let separator = normalized.lastIndex(of: "1") else {
+            return nil
+        }
+        let prefix = String(normalized[..<separator])
+        let payload = normalized[normalized.index(after: separator)...]
+        guard !prefix.isEmpty, payload.count >= 6, normalized.count <= 1023 else {
             return nil
         }
 

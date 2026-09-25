@@ -96,6 +96,11 @@ struct SignerTests {
         #expect(
             try CardanoSigner(mnemonic: cardano.mnemonic, address: baseAddress).address()
                 == baseAddress)
+
+        let uppercaseAddress = try Address(cardano.expected.address.uppercased())
+        #expect(
+            try CardanoSigner(mnemonic: cardano.mnemonic, address: uppercaseAddress).address()
+                == uppercaseAddress)
     }
 
     @Test("Cardano signer validates mnemonic and payment credential")
@@ -119,6 +124,12 @@ struct SignerTests {
         }
         #expect(throws: Tx3Error.signing(.invalidAddress)) {
             try CardanoSigner(mnemonic: cardano.mnemonic, address: try Address("00"))
+        }
+
+        let mixedCaseAddress =
+            "A" + cardano.expected.address.dropFirst()
+        #expect(throws: Tx3Error.validation(.invalidAddress(mixedCaseAddress))) {
+            try Address(mixedCaseAddress)
         }
     }
 
