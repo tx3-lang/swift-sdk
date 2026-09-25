@@ -149,6 +149,60 @@ struct FacadeTests {
             try client.withParty("Stranger", .address(try Address("0011")))
         }
         _ = client.withPartyUnchecked("generated-late", .address(try Address("0011")))
+
+        _ = try protocolValue.client()
+            .trpEndpoint(Self.endpoint)
+            .withParty("Stranger", .address(try Address("0011")))
+            .withPartyUnchecked("sTRANGER", .address(try Address("0022")))
+            .build()
+        #expect(throws: Tx3Error.unknownParty("stranger")) {
+            try protocolValue.client()
+                .trpEndpoint(Self.endpoint)
+                .withPartyUnchecked("Stranger", .address(try Address("0011")))
+                .withParty("sTRANGER", .address(try Address("0022")))
+                .build()
+        }
+    }
+
+    @Test("builder party bindings preserve validated and unchecked call order")
+    func builderPartyBindingOrder() async throws {
+        let protocolValue = try Protocol.fromFile(fixture("transfer.tii"))
+        let uncheckedLastTransport = FacadeTransport()
+        let validatedLastTransport = FacadeTransport()
+
+        let uncheckedLast = try protocolValue.client()
+            .trpEndpoint(Self.endpoint)
+            .withParty("Sender", .address(try Address("0011")))
+            .withPartyUnchecked("sENDER", .address(try Address("0022")))
+            .withTransport(uncheckedLastTransport)
+            .build()
+        let validatedLast = try protocolValue.client()
+            .trpEndpoint(Self.endpoint)
+            .withPartyUnchecked("SENDER", .address(try Address("0033")))
+            .withParty("sender", .address(try Address("0044")))
+            .withTransport(validatedLastTransport)
+            .build()
+
+        _ = try await uncheckedLast.tx("transfer")
+            .arg("quantity", 1)
+            .resolve()
+        _ = try await validatedLast.tx("transfer")
+            .arg("quantity", 1)
+            .resolve()
+
+        let uncheckedLastRequest = try #require(await uncheckedLastTransport.requests().first)
+        let validatedLastRequest = try #require(await validatedLastTransport.requests().first)
+        let uncheckedLastArgs =
+            try #require(
+                Self.payload(uncheckedLastRequest)["params"] as? [String: Any]
+            )["args"] as? [String: Any]
+        let validatedLastArgs =
+            try #require(
+                Self.payload(validatedLastRequest)["params"] as? [String: Any]
+            )["args"] as? [String: Any]
+
+        #expect((uncheckedLastArgs?["sender"] as? [String: String]) == ["address": "0022"])
+        #expect((validatedLastArgs?["sender"] as? [String: String]) == ["address": "0044"])
     }
 
     @Test("required arguments fail before transport")

@@ -48,7 +48,7 @@ public struct Tx3ClientBuilder: Sendable {
     private var headers: [String: String]
     private var selectedProfileName: String?
     private var parties: [String: Party]
-    private var uncheckedParties: [String: Party]
+    private var partyNamesRequiringValidation: Set<String>
     private var environmentOverrides: [String: JSONValue]
     private var transport: (any HTTPTransport)?
 
@@ -117,7 +117,7 @@ public struct Tx3ClientBuilder: Sendable {
         headers = [:]
         selectedProfileName = nil
         parties = [:]
-        uncheckedParties = [:]
+        partyNamesRequiringValidation = []
         environmentOverrides = [:]
         transport = nil
     }
@@ -144,7 +144,9 @@ public struct Tx3ClientBuilder: Sendable {
     /// Binds a declared party. Validation is deferred to ``build()``.
     public func withParty(_ name: String, _ party: Party) -> Tx3ClientBuilder {
         var copy = self
-        copy.parties[name.lowercased()] = party
+        let normalized = name.lowercased()
+        copy.parties[normalized] = party
+        copy.partyNamesRequiringValidation.insert(normalized)
         return copy
     }
 
@@ -160,7 +162,9 @@ public struct Tx3ClientBuilder: Sendable {
     /// This is the generated-client entry point; dynamic consumers should use ``withParty(_:_:)``.
     public func withPartyUnchecked(_ name: String, _ party: Party) -> Tx3ClientBuilder {
         var copy = self
-        copy.uncheckedParties[name.lowercased()] = party
+        let normalized = name.lowercased()
+        copy.parties[normalized] = party
+        copy.partyNamesRequiringValidation.remove(normalized)
         return copy
     }
 
@@ -202,7 +206,9 @@ public struct Tx3ClientBuilder: Sendable {
         } else {
             selectedProfile = nil
         }
-        if let unknown = parties.keys.sorted().first(where: { !knownParties.contains($0) }) {
+        if let unknown = partyNamesRequiringValidation.sorted().first(where: {
+            !knownParties.contains($0)
+        }) {
             throw Tx3Error.unknownParty(unknown)
         }
 
@@ -223,18 +229,13 @@ public struct Tx3ClientBuilder: Sendable {
         let trp =
             transport.map { TRPClient(options: finalOptions, transport: $0) }
             ?? TRPClient(options: finalOptions)
-        var boundParties = parties
-        for (name, party) in uncheckedParties {
-            boundParties[name] = party
-        }
-
         return Tx3Client(
             transactions: transactions,
             parameters: parameters,
             requiredParameters: requiredParameters,
             knownParties: knownParties,
             trp: trp,
-            parties: boundParties,
+            parties: parties,
             profileEnvironment: selectedProfile?.environment ?? [:],
             profileParties: profileParties,
             environmentOverrides: environmentOverrides
