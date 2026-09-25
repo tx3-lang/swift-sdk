@@ -14,6 +14,26 @@ public struct ArgMapEntry: Codable, Equatable, Sendable {
         self.key = key
         self.value = value
     }
+
+    /// Decodes the canonical two-element tagged pair.
+    public init(from decoder: any Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        key = try container.decode(ArgValue.self)
+        value = try container.decode(ArgValue.self)
+        guard container.isAtEnd else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "A tagged map entry must contain exactly two values"
+            )
+        }
+    }
+
+    /// Encodes the canonical two-element tagged pair.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        try container.encode(key)
+        try container.encode(value)
+    }
 }
 
 /// A JSON-compatible value used when the protocol schema cannot provide a stronger type.
@@ -106,6 +126,42 @@ public indirect enum ArgValue: Codable, Equatable, Sendable {
         let fields: [ArgValue]
     }
 
+    private static func decodeHex(
+        _ encoded: String, forKey key: CodingKeys,
+        in container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> Data {
+        let hex = encoded.hasPrefix("0x") ? String(encoded.dropFirst(2)) : encoded
+        guard hex.count.isMultiple(of: 2), hex.allSatisfy(\.isHexDigit) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: key,
+                in: container,
+                debugDescription: "The tagged bytes value is not an even-length hexadecimal string"
+            )
+        }
+
+        var bytes = Data()
+        bytes.reserveCapacity(hex.count / 2)
+        var index = hex.startIndex
+        while index < hex.endIndex {
+            let next = hex.index(index, offsetBy: 2)
+            guard let byte = UInt8(hex[index..<next], radix: 16) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: key,
+                    in: container,
+                    debugDescription: "The tagged bytes value contains invalid hexadecimal digits"
+                )
+            }
+            bytes.append(byte)
+            index = next
+        }
+        return bytes
+    }
+
+    private static func encodeHex(_ bytes: Data, prefixed: Bool) -> String {
+        let hex = bytes.map { String(format: "%02x", $0) }.joined()
+        return prefixed ? "0x" + hex : hex
+    }
+
     /// Decodes the canonical single-key tagged representation.
     public init(from decoder: any Decoder) throws {
         guard let container = try? decoder.container(keyedBy: CodingKeys.self) else {
@@ -119,20 +175,49 @@ public indirect enum ArgValue: Codable, Equatable, Sendable {
         }
         switch key {
         case .int:
-            let encoded = try container.decode(String.self, forKey: key)
-            guard let value = BigInt(encoded) else {
+            if let encoded = try? container.decode(String.self, forKey: key) {
+                let value: BigInt?
+                if encoded.hasPrefix("0x") {
+                    value = BigInt(encoded.dropFirst(2), radix: 16)
+                } else {
+                    value = BigInt(encoded)
+                }
+                guard let value else {
+                    throw DecodingError.dataCorruptedError(
+                        forKey: key,
+                        in: container,
+                        debugDescription:
+                            "The tagged integer is not a decimal or hexadecimal BigInt"
+                    )
+                }
+                self = .integer(value)
+            } else if let value = try? container.decode(Int64.self, forKey: key) {
+                self = .integer(BigInt(value))
+            } else {
                 throw DecodingError.dataCorruptedError(
                     forKey: key,
                     in: container,
-                    debugDescription: "The tagged integer is not a decimal BigInt"
+                    debugDescription: "The tagged integer is not an exact JSON integer"
                 )
             }
-            self = .integer(value)
         case .bool: self = .boolean(try container.decode(Bool.self, forKey: key))
         case .string: self = .string(try container.decode(String.self, forKey: key))
-        case .bytes: self = .bytes(try container.decode(Data.self, forKey: key))
+        case .bytes:
+            let encoded = try container.decode(String.self, forKey: key)
+            self = .bytes(try Self.decodeHex(encoded, forKey: key, in: container))
         case .address: self = .address(try container.decode(Address.self, forKey: key))
-        case .utxoRef: self = .utxoRef(try container.decode(UtxoRef.self, forKey: key))
+        case .utxoRef:
+            let encoded = try container.decode(String.self, forKey: key)
+            let parts = encoded.split(separator: "#", omittingEmptySubsequences: false)
+            guard parts.count == 2, let index = UInt32(parts[1]) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: key,
+                    in: container,
+                    debugDescription: "The tagged UTxO reference must use txid#index format"
+                )
+            }
+            let txId = try Self.decodeHex(String(parts[0]), forKey: key, in: container)
+            self = .utxoRef(UtxoRef(txId: txId, index: index))
         case .list: self = .list(try container.decode([ArgValue].self, forKey: key))
         case .tuple: self = .tuple(try container.decode([ArgValue].self, forKey: key))
         case .map: self = .mapPairs(try container.decode([ArgMapEntry].self, forKey: key))
@@ -153,9 +238,12 @@ public indirect enum ArgValue: Codable, Equatable, Sendable {
         case .integer(let value): try container.encode(String(value), forKey: .int)
         case .boolean(let value): try container.encode(value, forKey: .bool)
         case .string(let value): try container.encode(value, forKey: .string)
-        case .bytes(let value): try container.encode(value, forKey: .bytes)
+        case .bytes(let value):
+            try container.encode(Self.encodeHex(value, prefixed: true), forKey: .bytes)
         case .address(let value): try container.encode(value, forKey: .address)
-        case .utxoRef(let value): try container.encode(value, forKey: .utxoRef)
+        case .utxoRef(let value):
+            let encoded = "\(Self.encodeHex(value.txId, prefixed: false))#\(value.index)"
+            try container.encode(encoded, forKey: .utxoRef)
         case .list(let value): try container.encode(value, forKey: .list)
         case .tuple(let value): try container.encode(value, forKey: .tuple)
         case .mapPairs(let value): try container.encode(value, forKey: .map)

@@ -41,6 +41,7 @@ struct ContractTypesTests {
                 .integer(largeInteger),
                 .bytes(Data([0xde, 0xad, 0xbe, 0xef])),
                 .mapPairs([.init(key: .string("enabled"), value: .boolean(true))]),
+                .utxoRef(UtxoRef(txId: Data([0xaa, 0xbb]), index: 2)),
             ]
         )
         let encoder = JSONEncoder()
@@ -49,8 +50,39 @@ struct ContractTypesTests {
         #expect(try JSONDecoder().decode(ArgValue.self, from: data) == value)
         #expect(
             String(decoding: data, as: UTF8.self)
-                == #"{"struct":{"constructor":3,"fields":[{"int":"170141183460469231731687303715884105727"},{"bytes":"3q2+7w=="},{"map":[{"key":{"string":"enabled"},"value":{"bool":true}}]}]}}"#
+                == #"{"struct":{"constructor":3,"fields":[{"int":"170141183460469231731687303715884105727"},{"bytes":"0xdeadbeef"},{"map":[[{"string":"enabled"},{"bool":true}]]},{"utxoRef":"aabb#2"}]}}"#
         )
+    }
+
+    @Test("shared complex-type wire shapes decode canonically")
+    func sharedWireShapes() throws {
+        let decoder = JSONDecoder()
+
+        let unprefixedBytes = try decoder.decode(
+            ArgValue.self,
+            from: Data(#"{"bytes":"deadbeef"}"#.utf8)
+        )
+        #expect(unprefixedBytes == .bytes(Data([0xde, 0xad, 0xbe, 0xef])))
+
+        let map = try decoder.decode(
+            ArgValue.self,
+            from: Data(
+                #"{"map":[[{"string":"1"},{"int":100}],[{"string":"2"},{"int":200}]]}"#.utf8
+            )
+        )
+        #expect(
+            map
+                == .mapPairs([
+                    .init(key: .string("1"), value: .integer(BigInt(100))),
+                    .init(key: .string("2"), value: .integer(BigInt(200))),
+                ])
+        )
+
+        let utxo = try decoder.decode(
+            ArgValue.self,
+            from: Data(#"{"utxoRef":"aabb#2"}"#.utf8)
+        )
+        #expect(utxo == .utxoRef(UtxoRef(txId: Data([0xaa, 0xbb]), index: 2)))
     }
 
     @Test("signing values use stable field names")
