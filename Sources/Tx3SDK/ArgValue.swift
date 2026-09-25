@@ -235,12 +235,7 @@ public indirect enum ArgValue: Codable, Equatable, Sendable {
         }
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .integer(let value):
-            if let exact = Int64(String(value)) {
-                try container.encode(exact, forKey: .int)
-            } else {
-                try container.encode(String(value), forKey: .int)
-            }
+        case .integer(let value): try container.encode(String(value), forKey: .int)
         case .boolean(let value): try container.encode(value, forKey: .bool)
         case .string(let value): try container.encode(value, forKey: .string)
         case .bytes(let value):
