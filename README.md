@@ -25,9 +25,40 @@ Then import the public module:
 import Tx3SDK
 ```
 
-Runtime protocol loading and transaction lifecycle APIs are intentionally not
-part of this foundation revision. An unavailable operation is never represented
-as a successful result.
+## Low-level TRP client
+
+Advanced consumers can call the Transaction Resolver Protocol directly. Configure
+the endpoint and any hosted-service headers once, then use the async client:
+
+```swift
+let client = TRPClient(
+    options: ClientOptions(
+        endpoint: URL(string: "https://trp.example/rpc")!,
+        headers: ["Authorization": "Bearer …"],
+        timeout: .seconds(30)
+    )
+)
+
+let resolved = try await client.resolve(
+    ResolveParams(
+        tir: TIREnvelope(encoding: .hex, content: tirHex, version: "v1"),
+        args: ["quantity": .integer(100)]
+    )
+)
+let submitted = try await client.submit(
+    SubmitParams(tx: signedTransaction, witnesses: witnesses)
+)
+let status = try await client.checkStatus([submitted.hash])
+```
+
+TRP operations throw `Tx3Error.transport`. Its cases distinguish network, HTTP,
+JSON-RPC, malformed-response, timeout, and cancellation failures without string
+matching. Custom transports can be injected with
+`TRPClient(options:transport:)` for deterministic tests or alternate HTTP stacks.
+
+Higher-level protocol loading and transaction facade APIs are intentionally not
+part of this revision. An unavailable operation is never represented as a
+successful result.
 
 ## Development
 
