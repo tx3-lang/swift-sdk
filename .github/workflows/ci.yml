@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 16.4
+        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+      - name: Resolve dependencies
+        run: swift package resolve
+      - name: Build
+        run: swift build --configuration debug
+      - name: Lint formatting
+        run: swift format lint --strict --recursive Sources Tests
+      - name: Run unit tests
+        run: swift test --filter Tx3SDKTests --parallel
+      - name: Run iOS 18 simulator tests
+        run: >-
+          xcodebuild -scheme tx3-swift-sdk
+          -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5'
+          test
+      - name: Build external consumer
+        run: swift build --package-path examples/consumer
