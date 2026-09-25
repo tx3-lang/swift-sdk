@@ -13,22 +13,26 @@ struct ProtocolTests {
 
     @Test("all supported inputs produce equivalent protocols")
     func supportedInputs() throws {
-        let url = try fixture("transfer.tii")
-        let data = try Data(contentsOf: url)
-        let string = try String(contentsOf: url, encoding: .utf8)
-        let parsed = try JSONDecoder().decode(JSONValue.self, from: data)
+        for name in ["transfer.tii", "complex.tii"] {
+            let url = try fixture(name)
+            let data = try Data(contentsOf: url)
+            let string = try String(contentsOf: url, encoding: .utf8)
+            let parsed = try JSONDecoder().decode(JSONValue.self, from: data)
 
-        let fromFile = try Protocol.fromFile(url)
-        #expect(try Protocol.fromJSON(data) == fromFile)
-        #expect(try Protocol.fromJSON(string) == fromFile)
-        #expect(try Protocol.fromJSON(parsed) == fromFile)
-        #expect(fromFile.transactions.keys.sorted() == ["transfer"])
-        #expect(fromFile.parties.keys.sorted() == ["middleman", "receiver", "sender"])
-        #expect(fromFile.profiles.keys.sorted() == ["local", "preprod"])
-        #expect(fromFile.environmentParameters["tax"] == .integer)
-        #expect(fromFile.transactions["transfer"]?.parameters["quantity"] == .integer)
-        #expect(fromFile.transactions["transfer"]?.requiredParameters == ["quantity"])
-        _ = fromFile.client()
+            let fromFile = try Protocol.fromFile(url)
+            #expect(try Protocol.fromJSON(data) == fromFile)
+            #expect(try Protocol.fromJSON(string) == fromFile)
+            #expect(try Protocol.fromJSON(parsed) == fromFile)
+        }
+
+        let transfer = try Protocol.fromFile(fixture("transfer.tii"))
+        #expect(transfer.transactions.keys.sorted() == ["transfer"])
+        #expect(transfer.parties.keys.sorted() == ["middleman", "receiver", "sender"])
+        #expect(transfer.profiles.keys.sorted() == ["local", "preprod"])
+        #expect(transfer.environmentParameters["tax"] == .integer)
+        #expect(transfer.transactions["transfer"]?.parameters["quantity"] == .integer)
+        #expect(transfer.transactions["transfer"]?.requiredParameters == ["quantity"])
+        _ = transfer.client()
     }
 
     @Test("complex fixture retains TIR and interprets every parameter shape")
