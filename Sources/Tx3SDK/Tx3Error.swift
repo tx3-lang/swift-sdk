@@ -20,8 +20,8 @@ public enum ConstructionFailure: Equatable, Sendable {
 public enum ValidationFailure: Equatable, Sendable {
     /// A string is neither a checksummed Bech32 address nor hexadecimal bytes.
     case invalidAddress(String)
-    /// An integer is outside the signed 128-bit Tx3 boundary.
-    case integerOutOfRange
+    /// An integer at `path` is outside the expected signed 128-bit Tx3 boundary.
+    case integerOutOfRange(path: String, expected: String)
     /// A value does not match the expected public contract.
     case invalidValue(context: String)
 }

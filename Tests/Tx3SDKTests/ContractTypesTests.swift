@@ -100,7 +100,7 @@ struct ContractTypesTests {
             .unknownProfile("preview"),
             .unknownParty("sender"),
             .construction(.missingTrpEndpoint),
-            .validation(.integerOutOfRange),
+            .validation(.integerOutOfRange(path: "$", expected: "signed i128 integer")),
             .transport(.timeout),
             .resolution(.missingParameter(name: "amount")),
             .signing(.invalidKey),
