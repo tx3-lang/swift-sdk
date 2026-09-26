@@ -236,7 +236,7 @@ struct TransactionLifecycleTests {
         )
 
         let finalizedTransport = LifecycleTransport(results: [
-            Self.statusResult(.confirmed), Self.statusResult(.finalized)
+            Self.statusResult(.confirmed), Self.statusResult(.finalized),
         ])
         let clock = ImmediateClock()
         let finalized = SubmittedTx(
@@ -274,9 +274,11 @@ struct TransactionLifecycleTests {
         }
 
         let exhausted = SubmittedTx(
-            trp: Self.client(transport: LifecycleTransport(results: [
-                Self.statusResult(.pending), Self.statusResult(.pending),
-            ])),
+            trp: Self.client(
+                transport: LifecycleTransport(results: [
+                    Self.statusResult(.pending), Self.statusResult(.pending),
+                ])
+            ),
             hash: Self.hash,
             clock: ImmediateClock()
         )
@@ -331,10 +333,18 @@ struct TransactionLifecycleTests {
 
     @Test("poll configuration rejects invalid boundaries")
     func pollConfigurationValidation() {
-        #expect(throws: Tx3Error.validation(.invalidValue(context: "PollConfig attempts must be positive"))) {
+        #expect(
+            throws: Tx3Error.validation(
+                .invalidValue(context: "PollConfig attempts must be positive")
+            )
+        ) {
             try PollConfig(attempts: 0)
         }
-        #expect(throws: Tx3Error.validation(.invalidValue(context: "PollConfig delay must not be negative"))) {
+        #expect(
+            throws: Tx3Error.validation(
+                .invalidValue(context: "PollConfig delay must not be negative")
+            )
+        ) {
             try PollConfig(delay: .seconds(-1))
         }
         let defaults = try? PollConfig()
@@ -378,5 +388,4 @@ struct TransactionLifecycleTests {
     private static func payload(_ request: URLRequest) throws -> [String: Any] {
         try LifecycleTransport.payload(request)
     }
-
 }

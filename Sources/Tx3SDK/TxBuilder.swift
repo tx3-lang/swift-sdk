@@ -486,6 +486,7 @@ public struct ResolvedTx: Sendable {
 }
 
 extension ResolvedTx: Equatable {
+    /// Compares resolved transactions by their public hash and CBOR bytes.
     public static func == (lhs: ResolvedTx, rhs: ResolvedTx) -> Bool {
         lhs.hash == rhs.hash && lhs.txHex == rhs.txHex
     }
