@@ -26,6 +26,7 @@ struct SignerTests {
 
         #expect(signer.address() == address)
         #expect(witness.publicKeyHex == raw.expected.publicKeyHex)
+        #expect(witness.signatureHex == raw.expected.signatureHex)
         #expect(
             publicKey.isValidSignature(
                 try decodeHex(raw.expected.signatureHex),
@@ -181,7 +182,11 @@ private struct SignerVectors: Decodable {
 
 private func loadVectors() throws -> SignerVectors {
     let url = try #require(
-        Bundle.module.url(forResource: "signer-vectors", withExtension: "json")
+        Bundle.module.url(
+            forResource: "signer-vectors",
+            withExtension: "json",
+            subdirectory: "Fixtures"
+        )
     )
     return try JSONDecoder().decode(SignerVectors.self, from: Data(contentsOf: url))
 }
