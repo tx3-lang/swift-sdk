@@ -1,13 +1,31 @@
 {
-  "originHash" : "cf6f8fcdc7c27f79f4db3ac5f1838a8f6d3bd27ce608994a4c1ff58a0147273b",
+  "originHash" : "5490c31e77c21a3e8e6cc8517cdfcd8458ec060b9ea1169286e62fabb5345804",
   "pins" : [
+    {
+      "identity" : "base32",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/norio-nomura/Base32.git",
+      "state" : {
+        "revision" : "c4bc0a49689999ae2c7c778f3830a6a6e694efb8",
+        "version" : "0.9.0"
+      }
+    },
     {
       "identity" : "bigint",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/attaswift/BigInt.git",
       "state" : {
-        "revision" : "63feef7820abb1a8fb08587d7da56bb0b7db8751",
-        "version" : "6.0.1"
+        "revision" : "e07e00fa1fd435143a2dcf8b7eec9a7710b2fdfe",
+        "version" : "5.7.0"
+      }
+    },
+    {
+      "identity" : "swift-nacl",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Kingpin-Apps/swift-nacl.git",
+      "state" : {
+        "revision" : "31015115313f476e068ea57765fb295a2c1a6f01",
+        "version" : "1.0.2"
       }
     }
   ],

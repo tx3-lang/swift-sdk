@@ -1,0 +1,32 @@
+{
+  "description": "Canonical public vectors for SDK signer implementations. The CIP-1852 case was generated independently with the checksum-verified cardano-addresses 4.0.8 release; the raw Ed25519 case uses the RFC 8032 test key and a fixed 32-byte transaction-hash-shaped message. These are test-only public keys and mnemonic material, never funded identities or production credentials.",
+  "cardanoCip1852": {
+    "oracle": {
+      "tool": "cardano-address",
+      "version": "4.0.8",
+      "sourceCommit": "75588b052ead9fcd4925506c95d29b686e28f036",
+      "releaseAsset": "cardano-address-4.0.8-macos.tar.gz",
+      "releaseSha256": "f52c10d8a23060750160c31dce06fa97156bd7daf082a0461018c51405eacb60"
+    },
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "derivationPath": "m/1852'/1815'/0'/0/0",
+    "network": "preprod",
+    "expected": {
+      "publicKeyHex": "7ea09a34aebb13c9841c71397b1cabfec5ddf950405293dee496cac2f437480a",
+      "chainCodeHex": "88848e8af62a27a57e982215741c9eac17e6e45cbfd6ea65a0e0dcc03bb777b2",
+      "address": "addr_test1vq8ac7qqy0vtulyl7wntmsxc6wex80gvcyjy33qffrhm7ss9hjl0y"
+    }
+  },
+  "rawEd25519": {
+    "oracle": {
+      "spec": "RFC 8032, section 7.1 test key 1",
+      "messageSignature": "Generated independently with Node.js crypto Ed25519 from the RFC key over the fixed message below; any standards-conformant Ed25519 verifier may validate it."
+    },
+    "privateKeySeedHex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+    "messageHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "expected": {
+      "publicKeyHex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+      "signatureHex": "00c1db988bb12fd7351a6054ae3fac90fab7e4fc56b1651c7181f5f55f896f663933d3a90605d9058e9d0ac45950ee2d3c9c9b14857415587179fe0ccac35f09"
+    }
+  }
+}
