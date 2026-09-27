@@ -66,11 +66,12 @@ struct E2ETests {
             .arg("quantity", 10_000_000)
             .resolve()
         let submitted = try await resolved.sign().submit()
-        let polling = try PollConfig(attempts: 40, delay: .seconds(5))
+        let confirmationPolling = try PollConfig(attempts: 60, delay: .seconds(5))
+        let finalizationPolling = try PollConfig(attempts: 100, delay: .seconds(5))
 
-        let confirmed = try await submitted.waitForConfirmed(polling)
+        let confirmed = try await submitted.waitForConfirmed(confirmationPolling)
         #expect(confirmed.stage == .confirmed || confirmed.stage == .finalized)
-        let finalized = try await submitted.waitForFinalized(polling)
+        let finalized = try await submitted.waitForFinalized(finalizationPolling)
         #expect(finalized.stage == .finalized)
     }
 
