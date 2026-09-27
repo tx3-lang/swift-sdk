@@ -48,6 +48,7 @@ public struct Tx3ClientBuilder: Sendable {
     private var headers: [String: String]
     private var selectedProfileName: String?
     private var parties: [String: Party]
+    private var partyOrder: [String]
     private var partyNamesRequiringValidation: Set<String>
     private var environmentOverrides: [String: JSONValue]
     private var transport: (any HTTPTransport)?
@@ -117,6 +118,7 @@ public struct Tx3ClientBuilder: Sendable {
         headers = [:]
         selectedProfileName = nil
         parties = [:]
+        partyOrder = []
         partyNamesRequiringValidation = []
         environmentOverrides = [:]
         transport = nil
@@ -145,6 +147,9 @@ public struct Tx3ClientBuilder: Sendable {
     public func withParty(_ name: String, _ party: Party) -> Tx3ClientBuilder {
         var copy = self
         let normalized = name.lowercased()
+        if copy.parties[normalized] == nil {
+            copy.partyOrder.append(normalized)
+        }
         copy.parties[normalized] = party
         copy.partyNamesRequiringValidation.insert(normalized)
         return copy
@@ -163,6 +168,9 @@ public struct Tx3ClientBuilder: Sendable {
     public func withPartyUnchecked(_ name: String, _ party: Party) -> Tx3ClientBuilder {
         var copy = self
         let normalized = name.lowercased()
+        if copy.parties[normalized] == nil {
+            copy.partyOrder.append(normalized)
+        }
         copy.parties[normalized] = party
         copy.partyNamesRequiringValidation.remove(normalized)
         return copy
@@ -236,6 +244,7 @@ public struct Tx3ClientBuilder: Sendable {
             knownParties: knownParties,
             trp: trp,
             parties: parties,
+            partyOrder: partyOrder,
             profileEnvironment: selectedProfile?.environment ?? [:],
             profileParties: profileParties,
             environmentOverrides: environmentOverrides
@@ -251,6 +260,7 @@ public struct Tx3Client: Sendable {
     private let knownParties: Set<String>
     private let trp: TRPClient
     private var parties: [String: Party]
+    private var partyOrder: [String]
     private let profileEnvironment: [String: JSONValue]
     private let profileParties: [String: Party]
     private let environmentOverrides: [String: JSONValue]
@@ -262,6 +272,7 @@ public struct Tx3Client: Sendable {
         knownParties: Set<String>,
         trp: TRPClient,
         parties: [String: Party],
+        partyOrder: [String],
         profileEnvironment: [String: JSONValue],
         profileParties: [String: Party],
         environmentOverrides: [String: JSONValue]
@@ -272,6 +283,7 @@ public struct Tx3Client: Sendable {
         self.knownParties = knownParties
         self.trp = trp
         self.parties = parties
+        self.partyOrder = partyOrder
         self.profileEnvironment = profileEnvironment
         self.profileParties = profileParties
         self.environmentOverrides = environmentOverrides
@@ -296,7 +308,11 @@ public struct Tx3Client: Sendable {
     /// Binds a party without validating its name, for generated wrappers with baked-in names.
     public func withPartyUnchecked(_ name: String, _ party: Party) -> Tx3Client {
         var copy = self
-        copy.parties[name.lowercased()] = party
+        let normalized = name.lowercased()
+        if copy.parties[normalized] == nil {
+            copy.partyOrder.append(normalized)
+        }
+        copy.parties[normalized] = party
         return copy
     }
 
@@ -317,6 +333,7 @@ public struct Tx3Client: Sendable {
             tir: tir,
             environment: environment,
             parties: mergedParties,
+            signerOrder: partyOrder,
             parameters: parameters[name],
             requiredParameters: requiredParameters[name] ?? [],
             trp: trp
@@ -329,6 +346,7 @@ public struct TxBuilder: Sendable {
     private let tir: TIREnvelope?
     private let environment: [String: JSONValue]
     private let parties: [String: Party]
+    private let signerOrder: [String]
     private let parameters: [String: ParamType]?
     private let requiredParameters: [String]
     private let trp: TRPClient?
@@ -338,6 +356,7 @@ public struct TxBuilder: Sendable {
         tir: TIREnvelope,
         environment: [String: JSONValue],
         parties: [String: Party],
+        signerOrder: [String],
         parameters: [String: ParamType]?,
         requiredParameters: [String],
         trp: TRPClient
@@ -345,6 +364,7 @@ public struct TxBuilder: Sendable {
         self.tir = tir
         self.environment = environment
         self.parties = parties
+        self.signerOrder = signerOrder
         self.parameters = parameters
         self.requiredParameters = requiredParameters
         self.trp = trp
@@ -355,6 +375,7 @@ public struct TxBuilder: Sendable {
         tir = nil
         environment = [:]
         parties = [:]
+        signerOrder = []
         parameters = nil
         requiredParameters = []
         trp = nil
@@ -422,17 +443,51 @@ public struct TxBuilder: Sendable {
                 env: environment.isEmpty ? nil : environment
             )
         )
-        return ResolvedTx(hash: response.hash, txHex: response.tx)
+        let signers = signerOrder.compactMap { name -> TransactionSigner? in
+            guard case .signer(let signer) = parties[name] else { return nil }
+            return TransactionSigner(name: name, address: signer.address(), signer: signer)
+        }
+        return ResolvedTx(
+            trp: trp,
+            hash: response.hash,
+            txHex: response.tx,
+            signers: signers
+        )
     }
 }
 
 /// A transaction resolved to a hash and hexadecimal CBOR bytes.
 ///
 /// Signing and submission behavior is layered onto this value by the transaction-lifecycle API.
-public struct ResolvedTx: Equatable, Sendable {
+public struct ResolvedTx: Sendable {
     /// The resolver-produced transaction hash.
     public let hash: String
 
     /// The resolver-produced hexadecimal transaction CBOR.
     public let txHex: String
+
+    let trp: TRPClient?
+    let signers: [TransactionSigner]
+    let manualWitnesses: [TxWitness]
+
+    init(
+        trp: TRPClient? = nil,
+        hash: String,
+        txHex: String,
+        signers: [TransactionSigner] = [],
+        manualWitnesses: [TxWitness] = []
+    ) {
+        self.trp = trp
+        self.hash = hash
+        self.txHex = txHex
+        self.signers = signers
+        self.manualWitnesses = manualWitnesses
+    }
+}
+
+extension ResolvedTx: Equatable {
+    /// Compares resolved transactions by their public hash and CBOR bytes.
+    public static func == (lhs: ResolvedTx, rhs: ResolvedTx) -> Bool {
+        lhs.hash == rhs.hash && lhs.txHex == rhs.txHex
+    }
 }
