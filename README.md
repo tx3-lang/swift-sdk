@@ -154,8 +154,9 @@ transport errors; an unavailable operation is never represented as success.
 ## Live preprod tests
 
 The e2e suite loads the canonical transfer TII and exercises load, configure,
-resolve, sign, submit, confirmed wait, and finalized wait against TRP. Set all
-six canonical variables, then select the suite explicitly:
+resolve, sign, submit, and a confirmed wait against TRP. The live suite stops at
+confirmed; finalized-wait behavior remains covered by mocked-TRP unit tests. Set
+all six canonical variables, then select the suite explicitly:
 
 ```console
 TRP_ENDPOINT_PREPROD=https://preprod.trp.example \

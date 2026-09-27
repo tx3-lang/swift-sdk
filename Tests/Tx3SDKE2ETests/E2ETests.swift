@@ -55,7 +55,7 @@ private struct E2EConfiguration {
 
 @Suite("Tx3 SDK end-to-end", .serialized)
 struct E2ETests {
-    @Test("canonical transfer completes the confirmed and finalized lifecycle")
+    @Test("canonical transfer completes the confirmed lifecycle")
     func transferLifecycle() async throws {
         guard let configuration = try E2EConfiguration.load() else { return }
         let client = try Self.client(configuration)
@@ -66,13 +66,10 @@ struct E2ETests {
             .arg("quantity", 10_000_000)
             .resolve()
         let submitted = try await resolved.sign().submit()
-        let confirmationPolling = try PollConfig(attempts: 60, delay: .seconds(5))
-        let finalizationPolling = try PollConfig(attempts: 100, delay: .seconds(5))
+        let polling = try PollConfig(attempts: 40, delay: .seconds(5))
 
-        let confirmed = try await submitted.waitForConfirmed(confirmationPolling)
+        let confirmed = try await submitted.waitForConfirmed(polling)
         #expect(confirmed.stage == .confirmed || confirmed.stage == .finalized)
-        let finalized = try await submitted.waitForFinalized(finalizationPolling)
-        #expect(finalized.stage == .finalized)
     }
 
     @Test("spec errors remain typed")
