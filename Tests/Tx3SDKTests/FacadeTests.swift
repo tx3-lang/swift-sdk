@@ -114,9 +114,37 @@ struct FacadeTests {
         #expect(dynamicParams == partsParams)
         let args = try #require(dynamicParams["args"] as? [String: Any])
         #expect((args["sender"] as? [String: String]) == ["address": "0022"])
-        let env = try #require(dynamicParams["env"] as? [String: Any])
-        #expect(env["tax"] as? Int == 5_000_000)
-        #expect(env["network"] as? String == "preview")
+        #expect(args["tax"] as? Int == 5_000_000)
+        #expect(args["network"] as? String == "preview")
+        #expect(dynamicParams["env"] == nil)
+    }
+
+    @Test("environment, parties, and explicit arguments share one precedence-ordered args map")
+    func mergedResolveArguments() async throws {
+        let protocolValue = try Protocol.fromFile(fixture("transfer.tii"))
+        let transport = FacadeTransport()
+        let client = try protocolValue.client()
+            .trpEndpoint(Self.endpoint)
+            .withProfile("preprod")
+            .withEnvValue("SLOT", .number(1))
+            .withEnvValue("Tax", .number(6_000_000))
+            .withParty("sender", .address(try Address("0011")))
+            .withTransport(transport)
+            .build()
+
+        _ = try await client.tx("transfer")
+            .arg("quantity", 42)
+            .argTagged("TAX", .integer(7_000_000))
+            .argTagged("SENDER", .address(try Address("0022")))
+            .resolve()
+
+        let request = try #require(await transport.requests().first)
+        let params = try #require(Self.payload(request)["params"] as? [String: Any])
+        let args = try #require(params["args"] as? [String: Any])
+        #expect(args["slot"] as? Int == 1)
+        #expect((args["tax"] as? [String: String]) == ["int": "7000000"])
+        #expect((args["sender"] as? [String: String]) == ["address": "0022"])
+        #expect(params["env"] == nil)
     }
 
     @Test("builder and lookup failures occur at their specified boundary")

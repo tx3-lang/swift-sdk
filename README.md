@@ -74,8 +74,10 @@ print(submitted.hash, confirmed.stage, finalized.stage)
 `build()` distinguishes missing TRP configuration, unknown profiles, and
 unknown parties through `Tx3Error`. Transaction lookup reports `unknownTx`, and
 missing or invalid arguments fail before transport. Explicit transaction
-arguments override injected party addresses; explicit environment values
-override the selected profile. Built clients do not expose profile switching.
+arguments override injected party addresses and environment values; explicit
+environment values override the selected profile. Environment values, parties,
+and transaction arguments are sent together in the resolver `args` map. Built
+clients do not expose profile switching.
 
 Generated bindings seed the same builder with
 `Tx3ClientBuilder.fromParts(transactions:profiles:knownParties:)` and provide
