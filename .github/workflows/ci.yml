@@ -2,31 +2,105 @@ name: CI
 
 on:
   pull_request:
+    branches: [main]
   push:
     branches: [main]
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+
 jobs:
   unit:
+    name: Unit tests (macOS 14+)
     runs-on: macos-15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode 16.4
-        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
-      - name: Resolve dependencies
-        run: swift package resolve
-      - name: Build
-        run: swift build --configuration debug
-      - name: Lint formatting
-        run: swift format lint --strict --recursive Sources Tests
-      - name: Run unit tests
-        run: swift test --filter Tx3SDKTests --parallel
-      - name: Run iOS 18 simulator tests
-        run: >-
+        with:
+          persist-credentials: false
+      - run: swift package resolve
+      - run: swift build --configuration debug
+      - run: swift format lint --strict --recursive Sources Tests
+      - run: swift test --filter Tx3SDKTests --parallel
+
+  ios:
+    name: Unit tests (iOS 18 simulator)
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: swift package resolve
+      - run: >-
           xcodebuild -scheme tx3-swift-sdk
           -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5'
+          -only-testing:Tx3SDKTests
           test
-      - name: Build external consumer
-        run: swift build --package-path examples/consumer
+
+  consumer:
+    name: Clean external consumer
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: bash .github/scripts/consumer-check.sh
+
+  codegen:
+    name: Generated client
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.91
+      - uses: Swatinem/rust-cache@v2
+      - name: Install the accepted tx3c generator
+        run: >-
+          cargo install --locked
+          --git https://github.com/tx3-lang/tx3.git
+          --rev 2ca43858d1133279b2f6cdee97ac25b53494feeb
+          tx3c
+      - run: bash .github/scripts/codegen-check.sh
+
+  e2e:
+    name: Live preprod lifecycle
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      TRP_ENDPOINT_PREPROD: ${{ secrets.TRP_ENDPOINT_PREPROD }}
+      TRP_API_KEY_PREPROD: ${{ secrets.TRP_API_KEY_PREPROD }}
+      TEST_PARTY_A_ADDRESS: ${{ secrets.TEST_PARTY_A_ADDRESS }}
+      TEST_PARTY_A_MNEMONIC: ${{ secrets.TEST_PARTY_A_MNEMONIC }}
+      TEST_PARTY_B_ADDRESS: ${{ secrets.TEST_PARTY_B_ADDRESS }}
+      TEST_PARTY_B_MNEMONIC: ${{ secrets.TEST_PARTY_B_MNEMONIC }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require live-test configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in \
+            TRP_ENDPOINT_PREPROD TRP_API_KEY_PREPROD \
+            TEST_PARTY_A_ADDRESS TEST_PARTY_A_MNEMONIC \
+            TEST_PARTY_B_ADDRESS TEST_PARTY_B_MNEMONIC
+          do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing required e2e configuration: $name" >&2
+              exit 1
+            fi
+          done
+      - run: swift package resolve
+      - run: swift test --filter Tx3SDKE2ETests --parallel
