@@ -63,14 +63,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@1.91
-      - uses: Swatinem/rust-cache@v2
-      - name: Install the accepted tx3c generator
-        run: >-
-          cargo install --locked
-          --git https://github.com/tx3-lang/tx3.git
-          --rev 2ca43858d1133279b2f6cdee97ac25b53494feeb
-          tx3c
+      - name: Setup tx3 toolchain
+        uses: tx3-lang/actions/setup@v1
       - run: bash .github/scripts/codegen-check.sh
 
   e2e:
