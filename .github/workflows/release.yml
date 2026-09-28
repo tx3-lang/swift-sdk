@@ -20,6 +20,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # actions/checkout rewrites the pushed tag as a lightweight ref to the
+      # commit; restore the annotated tag object before validating it.
+      - name: Restore annotated release tag
+        run: git fetch --force --no-tags origin "+refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
       - name: Validate version, train, and annotated tag
         run: bash .github/scripts/release-check.sh "$GITHUB_REF_NAME"
       - run: swift package resolve
