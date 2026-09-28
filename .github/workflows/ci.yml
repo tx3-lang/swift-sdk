@@ -39,9 +39,14 @@ jobs:
         with:
           persist-credentials: false
       - run: swift package resolve
+      - name: Resolve the iOS 18.5 simulator
+        id: simulator
+        run: |
+          udid="$(bash .github/scripts/ios-simulator.sh 'iPhone 16 Pro' 18.5)"
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
       - run: >-
           xcodebuild -scheme tx3-swift-sdk
-          -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5'
+          -destination 'id=${{ steps.simulator.outputs.udid }}'
           -only-testing:Tx3SDKTests
           test
 
