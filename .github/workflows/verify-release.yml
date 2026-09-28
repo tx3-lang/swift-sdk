@@ -1,0 +1,27 @@
+name: Verify release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Released tag to consume by exact version (vMAJOR.MINOR.PATCH)
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+
+jobs:
+  consume:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Consume the released package by exact version
+        env:
+          TAG: ${{ inputs.tag }}
+        run: bash .github/scripts/released-consumer-check.sh "$TAG"
