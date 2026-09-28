@@ -183,7 +183,7 @@ public struct Tx3ClientBuilder: Sendable {
         return copy
     }
 
-    /// Adds or replaces one resolver-environment override.
+    /// Adds or replaces one resolver-environment argument override.
     public func withEnvValue(_ name: String, _ value: JSONValue) -> Tx3ClientBuilder {
         var copy = self
         copy.environmentOverrides[name] = value
@@ -321,9 +321,12 @@ public struct Tx3Client: Sendable {
     /// - Throws: ``Tx3Error/unknownTx(_:)`` when `name` is not declared.
     public func tx(_ name: String) throws -> TxBuilder {
         guard let tir = transactions[name] else { throw Tx3Error.unknownTx(name) }
-        var environment = profileEnvironment
+        var environment: [String: JSONValue] = [:]
+        for (key, value) in profileEnvironment {
+            environment[key.lowercased()] = value
+        }
         for (key, value) in environmentOverrides {
-            environment[key] = value
+            environment[key.lowercased()] = value
         }
         var mergedParties = profileParties
         for (name, party) in parties {
@@ -414,8 +417,8 @@ public struct TxBuilder: Sendable {
 
     /// Resolves this invocation through the configured TRP client.
     ///
-    /// Party addresses are injected first; explicit arguments override them. Required arguments
-    /// are checked before any transport call.
+    /// Environment values are injected first, followed by party addresses; explicit arguments
+    /// override both. Required arguments are checked before any transport call.
     ///
     /// - Throws: ``Tx3Error/resolution(_:)`` for missing required arguments, or a typed transport
     ///   failure from the TRP client.
@@ -425,11 +428,13 @@ public struct TxBuilder: Sendable {
                 .invalidArgument(path: "$", expected: "transaction seeded by Tx3Client.tx")
             )
         }
-        var arguments = Dictionary(
-            uniqueKeysWithValues: parties.map { name, party in
-                (name.lowercased(), ArgValue.address(party.addressValue))
-            }
-        )
+        var arguments: [String: ArgValue] = [:]
+        for (name, value) in environment {
+            arguments[name.lowercased()] = .json(value)
+        }
+        for (name, party) in parties {
+            arguments[name.lowercased()] = .address(party.addressValue)
+        }
         for (name, value) in taggedArguments {
             arguments[name] = value
         }
@@ -439,8 +444,7 @@ public struct TxBuilder: Sendable {
         let response = try await trp.resolve(
             ResolveParams(
                 tir: tir,
-                args: arguments,
-                env: environment.isEmpty ? nil : environment
+                args: arguments
             )
         )
         let signers = signerOrder.compactMap { name -> TransactionSigner? in

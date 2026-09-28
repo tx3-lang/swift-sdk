@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate version, train, and annotated tag
+        run: bash .github/scripts/release-check.sh "$GITHUB_REF_NAME"
+      - run: swift package resolve
+      - run: swift build --configuration release
+      - run: swift test --filter Tx3SDKTests --parallel
+      - name: Inspect source package contents
+        run: |
+          swift package dump-package > "$RUNNER_TEMP/package.json"
+          swift package describe --type json > "$RUNNER_TEMP/package-description.json"
+          git archive --format=tar "$GITHUB_REF_NAME" | tar -tf - > "$RUNNER_TEMP/package-contents.txt"
+          grep -Fx 'Package.swift' "$RUNNER_TEMP/package-contents.txt"
+          grep -E '^Sources/Tx3SDK/.+\.swift$' "$RUNNER_TEMP/package-contents.txt"
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
+      - name: Consume the released package by exact version
+        run: bash .github/scripts/released-consumer-check.sh "$GITHUB_REF_NAME"
