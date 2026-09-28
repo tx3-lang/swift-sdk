@@ -233,6 +233,44 @@ struct FacadeTests {
         #expect((validatedLastArgs?["sender"] as? [String: String]) == ["address": "0044"])
     }
 
+    @Test("withParties binds several parties on the builder and validates them on the client")
+    func bulkPartyBindings() async throws {
+        let protocolValue = try Protocol.fromFile(fixture("transfer.tii"))
+        let transport = FacadeTransport()
+
+        let client = try protocolValue.client()
+            .trpEndpoint(Self.endpoint)
+            .withParties([
+                "Sender": .address(try Address("0011")),
+                "receiver": .address(try Address("0022")),
+            ])
+            .withTransport(transport)
+            .build()
+            .withParties(["MIDDLEMAN": .address(try Address("0033"))])
+
+        _ = try await client.tx("transfer")
+            .arg("quantity", 1)
+            .resolve()
+
+        let request = try #require(await transport.requests().first)
+        let args =
+            try #require(Self.payload(request)["params"] as? [String: Any])["args"]
+            as? [String: Any]
+        #expect((args?["sender"] as? [String: String]) == ["address": "0011"])
+        #expect((args?["receiver"] as? [String: String]) == ["address": "0022"])
+        #expect((args?["middleman"] as? [String: String]) == ["address": "0033"])
+
+        #expect(throws: Tx3Error.unknownParty("stranger")) {
+            try protocolValue.client()
+                .trpEndpoint(Self.endpoint)
+                .withParties(["Stranger": .address(try Address("0011"))])
+                .build()
+        }
+        #expect(throws: Tx3Error.unknownParty("stranger")) {
+            try client.withParties(["Stranger": .address(try Address("0011"))])
+        }
+    }
+
     @Test("required arguments fail before transport")
     func missingRequiredArgument() async throws {
         let transport = FacadeTransport()
